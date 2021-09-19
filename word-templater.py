@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 
 import docx
 
@@ -43,6 +44,7 @@ class WordTemplateApp(QtWidgets.QMainWindow):
         self.ui.btnOutput.clicked.connect(lambda: self.changeOutputDir())
 
         self.ui.output.setText(self.directory)
+        self.ui.sex.addItems(["Муж", "Жен"])
 
         self.signals.status.connect(
             lambda s, v: (self.ui.lStatus.setText(s), self.ui.sbStatus.setProperty("value", v))
@@ -78,15 +80,29 @@ class WordTemplateApp(QtWidgets.QMainWindow):
 
             document = docx.Document(new_path)
 
+            keywords = self.fillInKeywords()
             for paragraph in document.paragraphs:
-                print(paragraph.text)
+                for keyword in keywords:
+                    paragraph.text = paragraph.text.replace(keyword, keywords[keyword])
+
+            document.save(new_path)
 
         word.Quit()
 
         self.signals.status.emit("Закрытие Word", 100)
         self.signals.inProgress.emit(False)
 
+        time.sleep(1)
+        self.signals.status.emit("Статус", 0)
+
     def start(self):
+        keywords = self.fillInKeywords()
+
+        for keyword in keywords:
+            if keywords[keyword] is None:
+                QtWidgets.QMessageBox.critical(self, "Неполные данные!", f"Проверьте введенные данные!")
+                return
+
         self._start()
 
     def changeOutputDir(self) -> None:
@@ -98,7 +114,7 @@ class WordTemplateApp(QtWidgets.QMainWindow):
     def chooseFiles(self) -> None:
         new_files, _ = QtWidgets.QFileDialog.getOpenFileNames(
             self,
-            "Выберите один или несколько фалов эксель",
+            "Выберите один или несколько фалов word",
             filter="Word Files|*.doc;*.docx;*.docm")
 
         for fs in new_files:
@@ -112,22 +128,57 @@ class WordTemplateApp(QtWidgets.QMainWindow):
             self.ui.listWidget.takeItem(idx.row())
             self.files.pop(idx.row())
 
-    def getIOFamily(self) -> str:
-        return ""
-
-    def getIOFull(self) -> str:
-        return ""
-
     def fillInKeywords(self) -> dict:
+
+        organization = self.ui.organization.text().strip()
+        position = self.ui.position.text().strip()
+        getter_iof = self.ui.iof.text().strip()
+        getter_sex = self.ui.sex.currentText().strip()
+        short_organ = self.ui.shortOrganization.text().strip()
+        sender_iof = self.ui.diof.text().strip()
+        sender_surname = self.ui.surname.text().strip()
+        doc_year = self.ui.year.text().strip()
+
+        def create_iof(iof: str = ""):
+            try:
+                i, o, f = list(map(str.capitalize, iof.split()))
+                return f"{i[0]}.{o[0]}.{f}"
+            except ValueError as e:
+                QtWidgets.QMessageBox.critical(self, "Неверные данные!", "Поле И.О.Ф заполненно не полностью!")
+                return None
+
+        def create_io(iof: str = ""):
+            try:
+                i, o, f = list(map(str.capitalize, iof.split()))
+                return f"{i} {o}"
+            except ValueError as e:
+                QtWidgets.QMessageBox.critical(self, "Неверные данные!", "Поле И.О.Ф заполненно не полностью!")
+                return None
+
+        def create_surname(iof: str = "", surname: str = ""):
+            try:
+                i, o, f = list(map(str.capitalize, iof.split()))
+                return f"{surname.capitalize()} {i[0]}.{o[0]}."
+            except ValueError as e:
+                QtWidgets.QMessageBox.critical(self, "Неверные данные!", "Поле И.О.Ф заполненно не полностью!")
+                return None
+
+        def sex(change: str):
+            if change == "Жен":
+                return "Уважаемая"
+            else:
+                return "Уважаемый"
+
         return {
-            "[Организация]": self.ui.organization.text().strip(),
-            "[Должность получателя]": self.ui.position.text().strip(),
-            "[И.О.Фамилия]": self.getIOFamily().strip(),
-            "[Имя Отчество]": self.getIOFull().strip(),
-            "[сокращенное наименование проверяемой организации]": self.ui.shortOrganization.text().strip(),
-            "[И.О. Фамилия]": None,
-            "(Фамилия И.О. руководителя задания по аудиту)": None,
-            "20ХХ": self.ui.year.text().strip()
+            "[Организация]": organization,
+            "[Должность получателя]": position,
+            "[И.О.Фамилия]": create_iof(getter_iof),
+            "[Имя Отчество]": create_io(getter_iof),
+            "[сокращенное наименование проверяемой организации]": short_organ,
+            "[И.О. Фамилия]": create_iof(sender_iof),
+            "(Фамилия И.О. руководителя задания по аудиту)": create_surname(sender_iof, sender_surname),
+            "20ХХ": doc_year,
+            "Уважаемый": sex(getter_sex)
         }
 
 
