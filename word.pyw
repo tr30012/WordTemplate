@@ -1,13 +1,18 @@
 import os
 import sys
 import time
+import logging
 
-import docx
+logging.basicConfig(filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-import pythoncom
-from threading import Thread
-from win32com.client import Dispatch
-from PyQt5 import QtCore, QtGui, QtWidgets
+try:
+    import docx
+    import pythoncom
+    from threading import Thread
+    from win32com.client import Dispatch
+    from PyQt5 import QtCore, QtGui, QtWidgets
+except Exception as er:
+    logging.error(er)
 
 
 def thread(function: callable) -> callable:
@@ -376,4 +381,7 @@ def py_main(argc: int, argv: list):
 
 
 if __name__ == '__main__':
-    py_main(sys.argv.__len__(), sys.argv)
+    try:
+        py_main(sys.argv.__len__(), sys.argv)
+    except Exception as ex:
+        logging.error(ex)
